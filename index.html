@@ -101,6 +101,11 @@
                 gamesTable.appendChild(row);
             });
 
+            if (!isAdminView) {
+                document.querySelectorAll('.spread-edit').forEach(input => input.setAttribute('readonly', true));
+                document.querySelectorAll('.result-select').forEach(select => select.setAttribute('disabled', true));
+            }
+
             document.querySelectorAll('.spread-edit').forEach(input => {
                 input.addEventListener('input', (e) => {
                     const index = e.target.dataset.index;
