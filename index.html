@@ -1,4 +1,21 @@
-<!DOCTYPE html>
+
+                        <input type="radio" name="pick-${game.awayTeam}-${game.homeTeam}" class="game-pick" value="${game.homeTeam}" required> ${game.homeTeam}
+                    </label>
+                `;
+                gamesPickButtons.appendChild(div);
+            });
+        }
+
+        function renderPicks() {
+            picksTable.innerHTML = '';
+            players.forEach(player => {
+                const totalGames = player.wins + player.losses;
+                const atsPercentage = totalGames > 0 ? ((player.wins / totalGames) * 100).toFixed(2) + '%' : '0%';
+                player.atsPercentage = atsPercentage;
+
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${player.name}</td><!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -141,9 +158,9 @@
                 row.innerHTML = `
                     <td>${game.awayTeam}</td>
                     <td>${game.homeTeam}</td>
-                    <td><input type="text" class="spread-edit" data-index="${index}" value="${game.spread}"></td>
+                    <td><input type="text" class="spread-edit" data-index="${index}" value="${game.spread}" ${!isAdminView ? 'readonly' : ''}></td>
                     <td>
-                        <select class="result-select" data-index="${index}">
+                        <select class="result-select" data-index="${index}" ${!isAdminView ? 'disabled' : ''}>
                             <option value="">--Select Winner--</option>
                             <option value="${game.awayTeam}" ${game.result === game.awayTeam ? 'selected' : ''}>${game.awayTeam}</option>
                             <option value="${game.homeTeam}" ${game.result === game.homeTeam ? 'selected' : ''}>${game.homeTeam}</option>
@@ -181,23 +198,6 @@
                         <input type="radio" name="pick-${game.awayTeam}-${game.homeTeam}" class="game-pick" value="${game.awayTeam}" required> ${game.awayTeam}
                     </label>
                     <label>
-                        <input type="radio" name="pick-${game.awayTeam}-${game.homeTeam}" class="game-pick" value="${game.homeTeam}" required> ${game.homeTeam}
-                    </label>
-                `;
-                gamesPickButtons.appendChild(div);
-            });
-        }
-
-        function renderPicks() {
-            picksTable.innerHTML = '';
-            players.forEach(player => {
-                const totalGames = player.wins + player.losses;
-                const atsPercentage = totalGames > 0 ? ((player.wins / totalGames) * 100).toFixed(2) + '%' : '0%';
-                player.atsPercentage = atsPercentage;
-
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${player.name}</td>
                     <td>${player.picks.join(', ')}</td>
                     <td>${player.wins}-${player.losses}</td>
                     <td>${player.atsPercentage}</td>
