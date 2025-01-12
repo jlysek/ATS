@@ -31,15 +31,284 @@
         }
     </style>
     <script>
+        // Your Firebase configuration
         const firebaseConfig = {
-            apiKey: "YOUR_API_KEY",
-            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-            databaseURL: "https://YOUR_PROJECT_ID.firebaseio.com",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_PROJECT_ID.appspot.com",
-            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-            appId: "YOUR_APP_ID"
+            apiKey: "AIzaSyBFTMfU9QiNMTIpj8nfV3vlkf7nsNBJJmw",
+            authDomain: "nfl-ats.firebaseapp.com",
+            databaseURL: "https://nfl-ats-default-rtdb.firebaseio.com",
+            projectId: "nfl-ats",
+            storageBucket: "nfl-ats.firebasestorage.app",
+            messagingSenderId: "607586184558",
+            appId: "1:607586184558:web:b765bcbc1dda939cf0a57f",
+            measurementId: "G-PMLQH7LNH1"
         };
+        
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        let games = [];
+        let players = [];
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const isAdminView = !urlParams.has('view') || urlParams.get('view') !== 'user';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadPage();
+            if (!isAdminView) {
+                document.querySelector('.admin-section').classList.add('hidden');
+            }
+        });
+
+        function saveGames() {
+            db.ref('games').set(games);
+        }
+
+        function savePlayers() {
+            db.ref('players').set(players);
+        }
+
+        function loadPage() {
+            db.ref('games').on('value', (snapshot) => {
+                games = snapshot.val() || [];
+                renderGames();
+                renderPickButtons();
+            });
+
+            db.ref('players').on('value', (snapshot) => {
+                players = snapshot.val() || [];
+                renderPicks();
+            });
+        }
+
+        function renderGames() {
+            const gamesTable = document.querySelector('#games-table tbody');
+            gamesTable.innerHTML = '';
+            games.forEach((game, index) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${game.awayTeam}</td>
+                    <td>${game.homeTeam}</td>
+                    <td><input type="text" class="spread-edit" data-index="${index}" value="${game.spread}" ${!isAdminView ? 'readonly' : ''}></td>
+                    <td>
+                        <select class="result-select" data-index="${index}" ${!isAdminView ? 'disabled' : ''}>
+                            <option value="">--Select Winner--</option>
+                            <option value="${game.awayTeam}" ${game.result === game.awayTeam ? 'selected' : ''}>${game.awayTeam}</option>
+                            <option value="${game.homeTeam}" ${game.result === game.homeTeam ? 'selected' : ''}>${game.homeTeam}</option>
+                        </select>
+                    </td>
+                `;
+                gamesTable.appendChild(row);
+            });
+
+            document.querySelectorAll('.spread-edit').forEach(input => {
+                input.addEventListener('input', (e) => {
+                    const index = e.target.dataset.index;
+                    games[index].spread = e.target.value;
+                    saveGames();
+                });
+            });
+
+            document.querySelectorAll('.result-select').forEach(select => {
+                select.addEventListener('change', (e) => {
+                    const index = e.target.dataset.index;
+                    games[index].result = e.target.value;
+                    saveGames();
+                    calculateRecords();
+                });
+            });
+        }
+
+        function renderPickButtons() {
+            const gamesPickButtons = document.querySelector('#games-pick-buttons');
+            gamesPickButtons.innerHTML = '';
+            games.forEach(game => {
+                const div = document.createElement('div');
+                div.innerHTML = `
+                    <p>${game.awayTeam} vs ${game.homeTeam} (${game.spread})</p>
+                    <label>
+                        <input type="radio" name="pick-${game.awayTeam}-${game.homeTeam}" class="game-pick" value="${game.awayTeam}" required> ${game.awayTeam}
+                    </label>
+                    <label>
+                        <input type="radio" name="pick-${game.awayTeam}-${game.homeTeam}" class="game-pick" value="${game.homeTeam}" required> ${game.homeTeam}
+                    </label>
+                `;
+                gamesPickButtons.appendChild(div);
+            });
+        }
+
+        function renderPicks() {
+            const picksTable = document.querySelector('#picks-table tbody');
+            picksTable.innerHTML = '';
+            players.forEach(player => {
+                const totalGames = player.wins + player.losses;
+                const atsPercentage = totalGames > 0 ? ((player.wins / totalGames) * 100).toFixed(2) + '%' : '0%';
+                player.atsPercentage = atsPercentage;
+
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${player.name}</td>
+                    <td>${player.picks.join(', ')}</td>
+                    <td>${player.wins}-${player.losses}</td>
+                    <td>${player.atsPercentage}</td>
+                `;
+                picksTable.appendChild(row);
+            });
+        }
+
+        function calculateRecords() {
+            players.forEach(player => {
+                player.wins = 0;
+                player.losses = 0;
+                player.picks.forEach(pick => {
+                    const game = games.find(g => g.result === pick);
+                    if (game) {
+                        player.wins++;
+                    } else {
+                        player.losses++;
+                    }
+                });
+            });
+            savePlayers();
+            renderPicks();
+        }
+
+        document.querySelector('#game-entry-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const awayTeam = document.querySelector('#away-team').value;
+            const homeTeam = document.querySelector('#home-team').value;
+            const spread = document.querySelector('#spread').value;
+
+            games.push({ awayTeam, homeTeam, spread, result: '', teams: [awayTeam, homeTeam] });
+            saveGames();
+            renderGames();
+            renderPickButtons();
+            e.target.reset();
+        });
+
+        document.querySelector('#picks-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const name = document.querySelector('#player-name').value;
+            const playerPicks = Array.from(document.querySelectorAll('.game-pick:checked')).map(input => input.value);
+
+            if (playerPicks.length !== games.length) {
+                alert('Please pick a team for every game!');
+                return;
+            }
+
+            const player = players.find(p => p.name === name);
+            if (player) {
+                player.picks = playerPicks;
+            } else {
+                players.push({ name, picks: playerPicks, wins: 0, losses: 0, atsPercentage: '0%' });
+            }
+
+            savePlayers();
+            renderPicks();
+            e.target.reset();
+        });
+    </script>
+</head>
+<body>
+    <h1>Jarrett's NFL ATS</h1>
+
+    <div class="admin-section">
+        <h2>Admin: Enter Games</h2>
+        <form id="game-entry-form">
+            <label for="away-team">Away Team: </label>
+            <input type="text" id="away-team" required>
+            <label for="home-team">Home Team: </label>
+            <input type="text" id="home-team" required>
+            <label for="spread">Spread (e.g., -6.5 for Home Favored, +6.5 for Away Favored): </label>
+            <input type="text" id="spread" required>
+            <button type="submit">Add Game</button>
+        </form>
+        <h3>Games for This Week</h3>
+        <table id="games-table">
+            <thead>
+                <tr>
+                    <th>Away Team</th>
+                    <th>Home Team</th>
+                    <th>Spread</th>
+                    <th>Result</th>
+                </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="picks-section">
+        <h2>Make Your Picks</h2>
+        <form id="picks-form">
+            <label for="player-name">Name: </label>
+            <input type="text" id="player-name" required>
+            <h3>Select Your Picks</h3>
+            <div id="games-pick-buttons"></div>
+            <button type="submit">Submit Picks</button>
+        </form>
+        <h3>Picks Submitted</h3>
+        <table id="picks-table" class="hidden">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Picks</th>
+                    <th>Record (Wins-Losses)</th>
+                    <th>ATS %</th>
+                </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jarrett's NFL ATS</title>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        table, th, td {
+            border: 1px solid black;
+        }
+        th, td {
+            padding: 10px;
+            text-align: center;
+        }
+        .admin-section, .picks-section {
+            margin-bottom: 30px;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+    <script>
+        // Your Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyBFTMfU9QiNMTIpj8nfV3vlkf7nsNBJJmw",
+            authDomain: "nfl-ats.firebaseapp.com",
+            databaseURL: "https://nfl-ats-default-rtdb.firebaseio.com",
+            projectId: "nfl-ats",
+            storageBucket: "nfl-ats.firebasestorage.app",
+            messagingSenderId: "607586184558",
+            appId: "1:607586184558:web:b765bcbc1dda939cf0a57f",
+            measurementId: "G-PMLQH7LNH1"
+        };
+        
+        // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
