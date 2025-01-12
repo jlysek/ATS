@@ -50,8 +50,9 @@
         let games = [];
         let players = [];
 
-        const urlParams = new URLSearchParams(window.location.search);
-        const isAdminView = urlParams.get('view') !== 'user';
+
+	const urlParams = new URLSearchParams(window.location.search);
+	const isAdminView = !(urlParams.get('view') && urlParams.get('view').toLowerCase() === 'user');
 
         document.addEventListener('DOMContentLoaded', () => {
             loadPage();
